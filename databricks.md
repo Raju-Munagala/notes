@@ -94,3 +94,70 @@ Databricks operates on top of your existing cloud infrastructure, integrating wi
 ## How Databricks is Priced
 
 Databricks uses a pay-as-you-go pricing model based on **Databricks Units (DBUs)**, a unit of processing power consumed per hour. Pricing varies depending on the cloud provider, the workload type (e.g., jobs, SQL, or ML), and the chosen plan (Standard, Premium, or Enterprise).
+
+
+
+# 3.Lakehouse Architecture
+
+A lakehouse architecture is a modern data management system that combines the low-cost, flexible storage of a data lake with the high-performance, structured features of a data warehouse. This unified approach eliminates the need for separate systems, allowing organizations to run business intelligence (BI), analytics, and machine learning (ML) workloads on a single platform.
+
+
+
+---
+
+## Core Components
+
+A lakehouse adds data warehousing capabilities on top of inexpensive cloud storage by using open-source table formats.
+
+* **Storage Layer:** This is the foundation, typically using cloud object storage like AWS S3, Azure Blob Storage, or Google Cloud Storage to hold vast amounts of structured and unstructured data in open formats like Apache Parquet.
+* **Metadata Layer (Table Format):** This is the key innovation. Open-source formats like **Delta Lake**, **Apache Iceberg**, and **Apache Hudi** create a transactional metadata layer over the raw files, enabling features such as:
+    * **ACID Transactions:** Ensures data reliability and consistency during concurrent read/write operations.
+    * **Schema Enforcement and Evolution:** Protects data quality by preventing incorrect data types from being written and allows tables to adapt to new data formats over time.
+    * **Time Travel:** Provides access to historical versions of a table for auditing, rollbacks, or reproducing experiments.
+* **Compute Layer:** The processing power is separate from the storage, allowing you to scale each independently. Engines like **Apache Spark** are used to query and process the data.
+* **Catalog Layer:** A central registry for all metadata, making it easy to discover, manage, and govern data assets.
+
+---
+
+## Comparison with Traditional Architectures
+
+The lakehouse was developed to overcome the limitations of having separate data lakes and data warehouses.
+
+| Feature         | Data Warehouse                               | Data Lake                                      | Lakehouse                                                           |
+| --------------- | -------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------- |
+| **Data Types** | Highly structured                            | All types (structured, unstructured)           | All types (structured, unstructured)                                |
+| **Storage** | Expensive, proprietary, integrated with compute | Cheap, scalable cloud object storage           | Cheap, scalable cloud object storage                                |
+| **Performance** | Optimized for fast BI queries                | Poor query performance without extra processing | High performance for both BI and ML workloads                       |
+| **Flexibility** | Rigid schema (schema-on-write)               | Flexible (schema-on-read), risks "data swamps" | Combines schema enforcement with flexibility over diverse data types |
+| **ACID Support**| Fully supported                              | Not supported                                  | Fully supported via the metadata layer                              |
+
+---
+
+## Benefits of a Lakehouse
+
+* **Simplified Architecture:** A single platform for all data eliminates silos and reduces the complexity of managing multiple systems.
+* **Cost Efficiency:** Leverages inexpensive cloud storage and minimizes costly data movement (ETL) between different platforms.
+* **Versatility:** Supports a wide range of workloads, from BI and SQL analytics to data science and machine learning, on the same data.
+* **Improved Governance:** The metadata layer enforces data quality and provides a central point for managing security, auditing, and compliance.
+* **Enhanced Reliability:** **ACID transactions** bring the data integrity of a data warehouse to the massive scale of a data lake.
+
+---
+
+## Common Industry Implementation
+
+A popular design pattern for organizing a lakehouse is the **medallion architecture**, which refines data through progressive stages:
+
+* **Bronze Layer:** This layer ingests raw, unaltered data directly from source systems. It serves as the historical archive and single source of truth.
+* **Silver Layer:** Data from the Bronze layer is cleaned, validated, and enriched. Issues like missing values and duplicates are resolved here, creating a more reliable dataset.
+* **Gold Layer:** This layer contains highly refined, aggregated data tables that are optimized for specific business use cases, such as BI reporting, analytics, and ML applications. 📈
+
+---
+
+## Key Players
+
+Several companies and open-source projects provide the technology to build a lakehouse:
+
+* **Databricks:** A pioneer of the concept, offering a unified platform built on open-source technologies like Delta Lake and Apache Spark.
+* **Google Cloud:** Provides a cloud-native solution using BigLake, Cloud Storage, and BigQuery.
+* **Microsoft Fabric:** An all-in-one analytics platform that includes a built-in lakehouse using the Delta Lake format.
+* **Apache Iceberg & Apache Hudi:** Popular open-source table formats that, like Delta Lake, provide the core transactional capabilities for a lakehouse.
