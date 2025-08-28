@@ -41,7 +41,7 @@ The platform's architecture is split into two distinct parts, ensuring security 
 
 
 
-# Introduction to Databricks
+# 2.Introduction to Databricks
 
 Databricks is a unified, cloud-based data analytics platform that combines data warehousing and data lakes into a single, collaborative system. Built by the creators of Apache Spark, it provides a comprehensive workspace for data engineers, data scientists, and business analysts to process, store, and analyze massive datasets.
 
