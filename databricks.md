@@ -819,4 +819,365 @@ To revert a table to a previous state, use the **`RESTORE`** command. This creat
   * **Data Retention:** The history is not kept forever. Its duration is controlled by table properties, with a default of 30 days for the transaction log and 7 days for the underlying data files.
   * **`VACUUM` Command:** Running the **`VACUUM`** command permanently deletes old data files that are past the retention period. Once these files are gone, you can no longer time travel to the versions that depended on them. Be careful when running this command. 🕰️
 
-# 14.
+# 14.Optimization in databricks
+
+Databricks optimization involves using a combination of automated platform features, smart data layout techniques, and efficient compute management to improve performance and control costs. The core of this is the **Photon** engine and **Delta Lake**, which provide many automatic improvements.
+
+---
+
+## Automated Platform Optimizations
+
+These features provide the biggest performance gains with the least manual effort.
+
+* **Predictive Optimization:** An AI-powered service for Unity Catalog tables that automatically runs maintenance commands like `OPTIMIZE` and `VACUUM`. It intelligently determines which tables need compacting or cleaning and runs these jobs at the ideal time.
+* **Photon Engine:** A high-performance, vectorized query engine built by Databricks that dramatically accelerates SQL and DataFrame operations. Enabling Photon on a cluster can significantly boost performance and lower compute costs without any code changes.
+* **Adaptive Query Execution (AQE):** A Spark feature that adjusts query plans on the fly. It can automatically optimize shuffle partitions and convert slow joins into much faster ones at runtime.
+* **Delta Cache:** Speeds up reads by caching remote data files on the local SSDs of cluster nodes. This is especially useful for BI and interactive queries where the same data is accessed repeatedly.
+
+
+
+---
+
+## Data and Storage Layout
+
+Organizing how your data is physically stored is key to fast queries.
+
+* **Liquid Clustering:** The next-generation replacement for partitioning and Z-Ordering. It dynamically clusters data based on the columns you query most often, offering more flexibility and better performance. Predictive Optimization can manage this automatically.
+* **`OPTIMIZE`:** This command compacts many small files into fewer, larger files. This is crucial for read performance, as opening many small files is inefficient.
+* **Data Skipping:** Delta Lake automatically collects statistics (min/max values) for each data file. When you run a query with a filter, the engine uses these stats to "skip" reading files that don't contain relevant data.
+* **Predicate Pushdown & Column Pruning:** These are fundamental Spark optimizations that ensure only the necessary columns and data partitions are read from storage, minimizing I/O.
+
+---
+
+## Cluster and Compute Management
+
+Efficiently managing your clusters is critical for controlling costs.
+
+* **Right-Sizing Clusters:** Choose the right virtual machine types for your workload (e.g., memory-optimized for heavy transformations, compute-optimized for complex calculations) to avoid paying for resources you don't need.
+* **Autoscaling and Auto-Termination:** Always enable **autoscaling** to allow your cluster to add or remove worker nodes based on its workload. Set an **auto-termination** timer to shut down idle clusters automatically and prevent unnecessary costs.
+* **Use Job vs. All-Purpose Clusters:** Run automated, scheduled production workflows (like ETL) on **Job clusters**, which are cheaper. Use **All-Purpose clusters** for interactive analysis and development in notebooks.
+* **Leverage Spot Instances:** Use lower-cost spot instances for workloads that can tolerate interruptions, which can significantly reduce compute costs.
+
+---
+
+## Code and Query Optimization
+
+While Databricks automates a lot, well-written code is still important.
+
+* **Tune Joins:** Ensure joins between a large and a small table use a **broadcast hash join**, which is much faster than a full shuffle. AQE often does this for you, but you can also use broadcast hints in your code.
+* **Handle Data Skew:** If your data is unevenly distributed across partitions, it can create bottlenecks. AQE can help mitigate this, or you can use techniques like "salting" to redistribute keys.
+* **Be Aware of Lazy Evaluation:** Spark doesn't execute transformations until an action is called. If you reuse an intermediate DataFrame multiple times, consider caching it to avoid recomputing it repeatedly. 🚀
+
+
+# 15.Data Quality & Validation Frameworks
+
+Databricks provides multiple native and third-party options for data quality and validation, combining its core platform features with purpose-built frameworks. Organizations often use a layered approach, applying different techniques as data moves through the **medallion architecture (Bronze, Silver, Gold)**.
+
+---
+
+## Native Databricks Frameworks
+
+### Delta Live Tables (DLT) with Expectations
+
+DLT is a declarative framework for building reliable ETL pipelines that automatically handles orchestration and data quality enforcement.
+
+* **Expectations:** Define data quality constraints using simple `EXPECT` clauses in SQL or Python. Violations can trigger different actions:
+    * **`expect`**: Logs violations as a warning without affecting the pipeline.
+    * **`expect or drop`**: Drops records that fail the expectation, ensuring only high-quality data continues in the pipeline.
+    * **`expect or fail`**: Immediately halts the pipeline if a critical expectation is violated, preventing bad data from corrupting downstream tables.
+* **Observability:** DLT automatically generates data quality metrics and visualizes them in the UI, providing insights into pipeline health.
+* **Use case:** Best for building and managing automated, robust data pipelines where quality checks are tightly integrated with transformations.
+
+### Databricks Labs DQX
+
+DQX (Data Quality Framework) is an open-source library from **Databricks Labs** for defining and enforcing data quality rules on PySpark DataFrames.
+
+* **Data profiling:** Automatically generates data quality rules by analyzing a dataset's profile.
+* **Rule definition:** Rules can be defined in YAML files or within Python code for both row-level and dataset-level checks.
+* **Rule enforcement:** Invalid data can be flagged, dropped, or quarantined for later review and remediation.
+* **Use case:** Suitable for custom, ad-hoc data quality checks or when a programmatic, code-based approach is preferred outside of a DLT pipeline.
+
+### Lakehouse Monitoring
+
+This integrated platform service provides out-of-the-box quality metrics and dashboards for data and AI assets managed in Unity Catalog.
+
+* **Automatic metrics:** Tracks key data health indicators like completeness (null percentage) and drift.
+* **Monitoring and alerts:** Auto-generates dashboards and allows users to define custom alerts for data quality issues.
+* **Lineage integration:** Alerts are integrated with Unity Catalog's data lineage to help with root-cause analysis.
+* **Use case:** Ideal for continuous, long-term monitoring of data and machine learning models in the lakehouse.
+
+### Delta Lake Constraints and Features
+
+The open-source Delta Lake format, which underpins the Databricks Lakehouse, includes built-in quality features.
+
+* **Schema enforcement:** Automatically blocks data writes that don't match a table's schema, ensuring data validity.
+* **`NOT NULL` and `CHECK` constraints:** Automatically identify and fail transactions that violate specified constraints.
+* **ACID transactions:** Guarantees that data writes are atomic, consistent, isolated, and durable, which prevents data corruption and ensures consistency.
+* **Use case:** Serves as the foundational layer of data quality, automatically maintaining data integrity at the table level.
+
+---
+
+## Third-Party Frameworks
+
+### Great Expectations (GX)
+
+A popular open-source data validation framework that helps data teams define, manage, and validate data expectations.
+
+* **Integration:** GX can be installed via `pip` on a Databricks cluster and run directly in notebooks, using Spark DataFrames as data sources.
+* **Expectation suites:** Expectations are saved into suites and used in checkpoints to validate data. Results are rendered as human-readable "Data Docs".
+* **Use case:** Excellent for teams that need a more extensive, test-driven approach to data quality, especially for documenting and communicating data health.
+
+### Soda Core
+
+An open-source Python library for data quality testing, which uses the Soda Checks Language (SodaCL) to scan datasets for quality issues.
+
+* **Integration:** Easily connects to Spark DataFrames within a Databricks notebook.
+* **SodaCL checks:** Data quality rules are written in a simple, YAML-based format, which is translated into SQL queries for execution.
+* **Use case:** Effective for teams looking to automate data validation with a lightweight, open-source tool. It also integrates with Soda Cloud for advanced monitoring.
+
+---
+
+## Commercial Data Observability Tools
+
+Databricks offers Partner Connect integrations with various commercial data quality and observability platforms that provide advanced features.
+
+* **Anomalo:** AI-powered data quality monitoring that integrates natively with Unity Catalog to automatically detect data quality issues and root causes.
+* **Lightup:** Connects directly to Databricks with support for Unity Catalog, providing no-code and low-code data quality checks for real-time monitoring.
+* **DQLabs:** Provides automated data profiling and quality scoring with customizable rules and dashboards for data assets in Databricks.
+* **Alation:** Integrates with Databricks Lakehouse Monitoring to expose data quality metrics in its data catalog for wider business consumption.
+* **Use case:** Best for enterprises that need advanced, automated, and cross-platform data quality monitoring with sophisticated alerting and a central management console.
+
+
+# 16.Medallion Architecture Fundamentals
+
+The Medallion Architecture is a data design pattern that organizes data in a lakehouse into three distinct layers: **Bronze** (raw), **Silver** (cleansed), and **Gold** (curated). Popularized by Databricks, this layered approach is designed to progressively improve data quality and structure as it moves from its raw source to an analysis-ready state.
+
+---
+
+## The Three Layers of Medallion Architecture
+
+
+
+#### 1. Bronze Layer (Raw Data)
+This is the first stop for all data coming from source systems.
+
+* **Purpose:** To create a historical archive of raw source data. This layer is crucial for auditing and for re-processing data pipelines if downstream logic needs to be changed.
+* **Characteristics:** Data is stored in its original, unprocessed format. It's typically immutable and appended over time.
+* **Users:** Primarily data engineers.
+
+#### 2. Silver Layer (Validated and Cleansed Data)
+Data from the Bronze layer is refined and structured in this stage.
+
+* **Purpose:** To provide a reliable, single source of truth for all key business entities. Data quality rules are applied to cleanse, conform, and enrich the data.
+* **Characteristics:** Data is standardized, de-duplicated, and validated. Errors and inconsistencies from the source systems are corrected here.
+* **Users:** Data scientists, data analysts, and engineers who need a trustworthy dataset for analysis and feature engineering.
+
+#### 3. Gold Layer (Curated and Enriched Data)
+This final layer contains data that is optimized for specific business use cases.
+
+* **Purpose:** To provide highly refined, aggregated data for analytics, Business Intelligence (BI) reporting, and machine learning models.
+* **Characteristics:** Data is often de-normalized and aggregated to optimize for query performance. This layer often contains business-level tables, such as weekly sales summaries or customer feature tables.
+* **Users:** Business analysts and other end-users consuming data through BI dashboards and reports.
+
+---
+
+## Key Advantages
+
+* **Improved Data Quality:** The layered approach ensures data is progressively cleaned and validated, leading to more reliable and trustworthy analytics.
+* **Clear Data Lineage:** It provides a traceable path for data from its raw state to its final, aggregated form, which is essential for governance and debugging.
+* **Flexibility and Reusability:** If a pipeline breaks or business logic changes, you can easily rebuild the Silver and Gold layers from the raw, untouched data in the Bronze layer.
+* **Optimized Performance:** Gold tables are specifically designed and aggregated for fast queries, which is critical for interactive BI dashboards.
+
+---
+
+## Delta Lake's Role in the Medallion Architecture
+
+This architecture is most effective when implemented on a lakehouse platform using **Delta Lake**, which provides critical features:
+
+* **ACID Transactions:** Guarantees that data is processed reliably at each stage, preventing data corruption.
+* **Schema Enforcement and Evolution:** Ensures data quality by blocking bad data while allowing schemas to adapt to new columns over time.
+* **Time Travel:** Allows you to query older versions of data at any layer, which is useful for audits or rolling back mistakes.
+
+---
+
+## When to Use the Medallion Architecture
+
+This pattern is especially valuable for organizations that:
+* Deal with large volumes of data from many different sources.
+* Have strict data quality, governance, and compliance requirements.
+* Need to support a wide range of use cases, from data engineering to BI and AI.
+* Want to create a scalable and reliable data platform instead of a disorganized "data swamp." 🏅
+
+
+# 17.bronze layer (raw data)
+
+In the Medallion Architecture, the **Bronze layer** is the initial landing zone where raw, unprocessed data is ingested from various source systems. It functions as a historical archive, capturing data "as-is" to serve as the single source of truth for all subsequent data processing.
+
+---
+
+## Key Characteristics
+
+
+
+* **Raw and Unprocessed:** Data is stored in its original format and state. It may contain errors, duplicates, and inconsistencies, as no cleaning or validation has been applied.
+* **Append-Only and Immutable:** New data is typically appended to existing tables, and the historical data is never updated or modified. This preserves a complete and unaltered audit trail.
+* **Minimal Transformations:** The only changes made are light, operational ones, like adding metadata columns to track when the data was loaded or where it came from. No business logic is applied.
+* **Optimized for Storage:** While the format is raw, the data is stored efficiently in formats like Delta Lake or Parquet, which are optimized for low-cost cloud storage and scalable reads.
+
+---
+
+## Purpose and Benefits
+
+The primary goal of the Bronze layer is to create a reliable and durable foundation for the entire data pipeline.
+
+* **Historical Archive:** It provides a complete, raw backup of all source data. If downstream pipelines break or business logic changes, you can always rebuild the Silver and Gold layers from this pristine source.
+* **Data Lineage and Auditability:** By preserving the original state of the data, you maintain a clear and traceable path back to the source, which is critical for governance and compliance.
+* **Decoupled Pipelines:** Separating raw data ingestion (Bronze) from transformation (Silver/Gold) makes your system more resilient. A change in a source schema won't break the entire pipeline, only the specific job that reads from that Bronze table.
+
+---
+
+## Who Uses the Bronze Layer
+
+The Bronze layer is almost exclusively used by **data engineers and operations teams**. It is not intended for direct use by business analysts or data scientists, who should consume the cleaner, more reliable data from the Silver and Gold layers.
+
+---
+
+## Bronze vs. Other Medallion Layers
+
+The key difference between the layers is the level of data refinement:
+
+* **Bronze (Raw):** The starting point. Contains raw, untransformed source data.
+* **Silver (Validated):** Built from Bronze, this layer contains cleansed, standardized, and integrated data, forming an "enterprise view."
+* **Gold (Enriched):-** Built from Silver, this is the final, curated layer with highly aggregated, business-level data optimized for analytics and BI. 🥉
+
+
+# 18.silver layer (cleaned data)
+
+In the Medallion Architecture, the **Silver layer** is where raw data from the Bronze layer is cleaned, validated, and enriched. It acts as a reliable, single source of truth, providing a unified "enterprise view" of key business entities like customers, products, and sales.
+
+---
+
+## Data Cleaning and Processing
+
+Data engineers transform the raw Bronze data into a trustworthy Silver dataset by applying a series of quality improvements.
+
+
+
+Key cleaning strategies include:
+* **Handling Missing Values:** Filling in or removing nulls and empty data points.
+* **Data Deduplication:** Identifying and removing duplicate records.
+* **Data Validation:** Applying rules to ensure data conforms to expected formats (e.g., valid email addresses, correct date formats).
+* **Standardization:** Converting values into consistent formats, like standardizing country codes or units of measurement.
+* **Error Correction:** Fixing corrupted or inconsistent data.
+
+---
+
+## Characteristics of the Silver Layer
+
+* **Enterprise-Level View:** It integrates data from various sources to create a single, unified view of core business concepts.
+* **More Structured Data:** Raw, semi-structured data is modeled into well-defined tables with enforced schemas.
+* **Enrichment:** Data is often enriched with other sources to add more context and business value.
+* **Ready for Analysis:** The data is clean and reliable enough for data scientists and analysts to use for exploratory analysis, ad-hoc reporting, and as a source for machine learning models.
+* **Versioning and Lineage:** When built with Delta Lake, this layer maintains a full history of changes, allowing for time travel and clear data lineage back to the raw source.
+
+---
+
+## Use Cases for the Silver Layer
+
+The Silver layer is the primary source for many data professionals who need high-quality, detailed data before it gets aggregated.
+
+* **Data Engineers** use it as a reliable source to build the final, aggregated Gold layer tables.
+* **Data Scientists** use it for feature engineering and training machine learning models.
+* **Data Analysts** use it for deep, ad-hoc analysis that requires a more granular view than what the Gold layer provides. 🥈
+
+# 19.gold layer (business ready)
+
+In the Medallion Architecture, the **Gold layer** is the final, most refined stage, containing aggregated, business-ready data optimized for analytics, reporting, and machine learning. It transforms the clean data from the Silver layer into high-value "data products" that directly answer specific business questions.
+
+---
+
+## Characteristics of the Gold Layer
+
+
+
+* **Business-Centric:** Data is organized around business functions or use cases, such as weekly sales summaries or customer churn models, rather than raw source systems.
+* **Highly Refined and Aggregated:** This layer contains key performance indicators (KPIs) and other metrics that result from applying complex business logic and calculations.
+* **Optimized for Performance:** To ensure fast queries for BI dashboards, data is often denormalized and structured into dimensional models like star schemas. This minimizes the need for complex joins.
+* **Trusted and Governed:** The Gold layer is the "single source of truth" for critical business metrics and is subject to the strictest data quality and governance rules.
+
+---
+
+## How the Gold Layer Achieves Business Readiness
+
+The Gold layer is the culmination of the refinement process that starts in the previous layers.
+
+1.  **Bronze Layer:** All raw, unfiltered data is ingested and archived.
+2.  **Silver Layer:** Data is cleansed, standardized, and combined to create a reliable, enterprise-wide view of key entities (e.g., a master customer table).
+3.  **Gold Layer:** This layer consumes the clean Silver data to create tailored, aggregated datasets. For example, it might join customer data with transaction data to produce a `monthly_customer_spending` table. It's also where final **enrichment** occurs, such as adding third-party data to create a 360-degree customer view. The final output is a **consumption-ready** data product.
+
+---
+
+## Common Use Cases
+
+The highly curated datasets in the Gold layer are directly consumed by various end-users and applications.
+
+* **Business Intelligence:** Powering executive dashboards, reports, and visualizations in tools like Tableau or Power BI.
+* **Data Science and ML:** Providing clean, aggregated feature tables for training and running machine learning models for forecasting or customer segmentation.
+* **Metrics Monitoring:** Serving as the definitive source for tracking core business KPIs.
+* **Operational Applications:** Feeding curated data into other applications for data-driven decision-making. 🏆
+
+
+# 20.cross-layer considerations for medallion architecture
+
+Cross-layer considerations for the Medallion Architecture involve applying holistic strategies for governance, quality, security, and performance that span the Bronze, Silver, and Gold layers. Instead of treating each layer in isolation, these principles ensure the entire data lifecycle is managed consistently and effectively.
+
+
+
+---
+
+## Cross-Layer Data Governance and Lineage
+
+This involves managing and tracking data from its raw source to its final, curated state.
+
+* **Establish a Central Catalog:** Use a tool like Databricks Unity Catalog to create a single, unified view of all your data assets and their metadata across every layer.
+* **Track Lineage Automatically:** Implement tools that automatically capture the data's journey as it is transformed from Bronze to Silver to Gold. This is essential for auditing, compliance, and impact analysis.
+* **Define Ownership Per Layer:** Clearly assign responsibility for the data at each stage. For example, a source system owner may be responsible for the raw Bronze data, while a business domain team owns the final Gold data product.
+* **Implement Data Contracts:** Establish clear, agreed-upon standards for the data schema and quality between the layers. This prevents upstream changes from unexpectedly breaking downstream pipelines.
+
+---
+
+## Cross-Layer Data Quality
+
+This ensures that data is accurate, complete, and consistent throughout the refinement process.
+
+* **Apply Layer-Specific Validation:** Enforce different types of quality checks appropriate for each stage:
+    * **Bronze:** Basic checks for file integrity and schema structure.
+    * **Silver:** In-depth validation of business rules, checking for duplicates, and ensuring referential integrity.
+    * **Gold:** High-level checks to ensure key business metrics are accurate and consistent.
+* **Monitor for Data Drift:** Use automated tools to detect unexpected changes in the data's statistical properties or schema as it moves between layers.
+* **Handle Bad Data Gracefully:** Implement a strategy to quarantine or flag bad data to prevent it from contaminating the entire pipeline, rather than just letting the job fail.
+
+---
+
+## Cross-Layer Security
+
+This involves protecting data consistently as it moves through the architecture.
+
+* **Use Role-Based Access Control (RBAC):** Apply granular permissions to control who can access the data at each layer:
+    * **Bronze:** Access is often restricted to data engineers to protect the raw, immutable source data.
+    * **Silver:** Broader access may be given to data scientists and analysts for exploration and feature engineering.
+    * **Gold:** Access can be widely granted to business users for reporting and analytics.
+* **Encrypt Sensitive Data:** Ensure data is encrypted both at rest (in storage) and in transit (as it moves between layers).
+* **Tag Sensitive Data:** Use tags to identify and track sensitive data like Personally Identifiable Information (PII) across all layers to ensure it's handled appropriately.
+
+---
+
+## Cross-Layer Performance and Cost Optimization
+
+This involves making strategic decisions to balance query speed and infrastructure costs across the entire pipeline.
+
+* **Use Tiered Storage:** Align storage costs with data value. Use low-cost storage for the raw, infrequently accessed Bronze data and higher-performance storage for the frequently queried Gold layer.
+* **Implement Incremental Processing:** Use Change Data Capture (CDC) or similar techniques to process only new or changed data, which significantly reduces compute costs and improves pipeline efficiency.
+* **Tune for Specific Workloads:** Optimize compute resources for each layer. The Gold layer may need more expensive, always-on compute for fast BI dashboards, while the Silver layer can run on cheaper, scheduled batch clusters. 🌐
+
+# 21.
